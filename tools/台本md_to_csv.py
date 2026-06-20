@@ -75,6 +75,14 @@ def build_edit_note(char, serif, sit, telop):
     return ' / '.join(notes)
 
 
+def short_place(place, max_chars=6):
+    """場所が長い時は中黒「・」の最後の区画だけにする（騎士団本部・団長執務室→団長執務室）。
+    テロップが横に伸びすぎるのを防ぐ。編集ツール側と同じ規則。"""
+    place = (place or '').strip()
+    if '・' in place and len(place) > max_chars:
+        return place.rsplit('・', 1)[-1].strip()
+    return place
+
 def split_place_time(scene_cell):
     """シーン列「【ラベル】場所／時間」→ (場所, 時間)。ラベル・先頭の（回想）等を除去。"""
     s = re.sub(r'^【.*?】', '', (scene_cell or '').strip()).strip()
@@ -158,7 +166,8 @@ def convert(md_path, csv_path=None):
             place, ptime = split_place_time(cur_scene)
             if place and place != prev_place:        # 場所が変わった→次の行にテロップ
                 tl = extract_time_jump(ptime)
-                pending_telop = f'{tl}｜{place}' if tl else place
+                disp = short_place(place)            # 長い場所は最後の区画だけ（団長執務室 等）
+                pending_telop = f'{tl}｜{disp}' if tl else disp
                 if PARTING_RE.search(last_sit) or SORROW_RE.search(last_sit):
                     pending_dissolve = True           # 直前が別れ/切ない→この場面へディゾルブ
             if place:
