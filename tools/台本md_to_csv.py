@@ -29,12 +29,22 @@ import re, csv, sys, os
 PAREN = r'[（(][^）)]*[）)]'           # 全角/半角どちらの括弧も拾う
 MONO_KW = ('独白', 'モノローグ', '心の声', '心中')
 SKIP_SPEAKERS = ('右サムネ', '左サムネ', 'サムネ', 'ジャンル')
-TIME_JUMP = re.compile(r'後|翌|その夜|頃|年|ヶ?月|週間?|数日|同じ|まもなく|やがて')
+TIME_JUMP_EXTRACT = re.compile(
+    r'(翌朝|翌日|翌晩|翌週|翌年|その夜|その後|後日|数日後|数週間後|数ヶ月後|数年後|数時間後|'
+    r'[一二三四五六七八九十百千〇0-9０-９]+\s*(?:年|ヶ月|か月|カ月|週間|日|時間|分)後|'
+    r'しばらく後|まもなく|やがて)')
+
+
+def extract_time_jump(time_str):
+    """時間欄の説明文から、時系列ジャンプ語だけを抜き出す（無ければ空）。"""
+    m = TIME_JUMP_EXTRACT.search(time_str or '')
+    return m.group(1) if m else ''
 
 
 def split_place_time(scene_cell):
-    """シーン列「【ラベル】場所／時間」→ (場所, 時間)。ラベル除去。"""
+    """シーン列「【ラベル】場所／時間」→ (場所, 時間)。ラベル・先頭の（回想）等を除去。"""
     s = re.sub(r'^【.*?】', '', (scene_cell or '').strip()).strip()
+    s = re.sub(r'^[（(][^）)]*[）)]\s*', '', s).strip()   # 先頭の（回想）等を除く
     if not s:
         return '', ''
     parts = re.split(r'[／/]', s, maxsplit=1)
@@ -106,7 +116,7 @@ def convert(md_path, csv_path=None):
             cur_scene = f'【{cur_label}】{scene_text(s[len("【場面】"):])}'
             place, ptime = split_place_time(cur_scene)
             if place and place != prev_place:        # 場所が変わった→次の行にテロップ
-                tl = ptime if (ptime and TIME_JUMP.search(ptime)) else ''
+                tl = extract_time_jump(ptime)
                 pending_telop = f'{tl}｜{place}' if tl else place
             if place:
                 prev_place = place
